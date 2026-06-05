@@ -4,17 +4,22 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import BrandMark from '@/components/BrandMark.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { factoriesApi, employeesApi } from '@/api/resources'
+import { useAuthStore } from '@/stores/auth'
 
+const auth = useAuthStore()
 const mobileOpen = ref(false)
 const counts = ref({ factories: null, employees: null })
 
 onMounted(async () => {
+  // Refresh the signed-in user's profile (name, email, role) for the sidebar.
+  auth.fetchProfile()
+
   // Populate sidebar badges. Failures are silent — badges just stay hidden.
   try {
     const [f, e] = await Promise.all([factoriesApi.list(), employeesApi.list()])
     counts.value = {
-      factories: Array.isArray(f) ? f.length : f?.total ?? null,
-      employees: Array.isArray(e) ? e.length : e?.total ?? null,
+      factories: f?.pagination?.total ?? (Array.isArray(f?.data) ? f.data.length : null),
+      employees: e?.pagination?.total ?? (Array.isArray(e?.data) ? e.data.length : null),
     }
   } catch {
     /* ignore */

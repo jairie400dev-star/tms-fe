@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { employeesApi, factoriesApi } from '@/api/resources'
 import { useToast } from '@/composables/useToast'
+import { ROUTE_NAMES } from '@/config'
 
 const props = defineProps({ id: { type: [String, Number], default: null } })
 const router = useRouter()
@@ -14,20 +15,14 @@ const saving = ref(false)
 const errors = ref({})
 const factories = ref([])
 
-const form = ref({ first_name: '', last_name: '', factory_id: '', email: '', phone: '' })
+const form = ref({ firstname: '', lastname: '', factory_id: '', email: '', phone: '' })
 
-const rules = [
-  { field: 'First name', note: 'required', required: true },
-  { field: 'Last name', note: 'required', required: true },
-  { field: 'Factory', note: 'required, exists:factories,id', required: true },
-  { field: 'Email', note: 'optional, valid email', required: false },
-  { field: 'Phone', note: 'optional', required: false },
-]
+// Validation rules panel removed
 
 function validate() {
   const e = {}
-  if (!form.value.first_name.trim()) e.first_name = 'First name is required.'
-  if (!form.value.last_name.trim()) e.last_name = 'Last name is required.'
+  if (!form.value.firstname.trim()) e.firstname = 'First name is required.'
+  if (!form.value.lastname.trim()) e.lastname = 'Last name is required.'
   if (!form.value.factory_id) e.factory_id = 'Please choose a factory.'
   if (form.value.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.value.email))
     e.email = 'Enter a valid email.'
@@ -58,7 +53,7 @@ async function submit() {
 
 onMounted(async () => {
   try {
-    factories.value = await factoriesApi.list()
+    factories.value = await factoriesApi.listAll()
   } catch {
     /* ignore */
   }
@@ -67,8 +62,8 @@ onMounted(async () => {
       const e = await employeesApi.get(props.id)
       if (e)
         form.value = {
-          first_name: e.first_name,
-          last_name: e.last_name,
+          firstname: (e.firstname ?? e.first_name) || '',
+          lastname: (e.lastname ?? e.last_name) || '',
           factory_id: String(e.factory_id ?? ''),
           email: e.email || '',
           phone: e.phone || '',
@@ -83,7 +78,7 @@ onMounted(async () => {
 <template>
   <div>
     <nav class="flex items-center gap-1.5 text-sm text-primary-600">
-      <router-link :to="{ name: 'employees' }" class="hover:underline">Employees</router-link>
+      <router-link :to="{ name: ROUTE_NAMES.EMPLOYEES }" class="hover:underline">Employees</router-link>
       <AppIcon name="chevron" :size="14" class="-rotate-90 text-ink/30" />
       <span class="text-ink/50">{{ isEdit ? 'Edit employee' : 'New employee' }}</span>
     </nav>
@@ -99,13 +94,13 @@ onMounted(async () => {
           <div class="grid gap-5 sm:grid-cols-2">
             <div>
               <label class="field-label">First name <span class="text-primary-500">*</span></label>
-              <input v-model="form.first_name" class="field-input" placeholder="First name" />
-              <p v-if="errors.first_name" class="mt-1 text-xs text-rose-600">{{ errors.first_name }}</p>
+              <input v-model="form.firstname" class="field-input" placeholder="First name" />
+              <p v-if="errors.firstname" class="mt-1 text-xs text-rose-600">{{ errors.firstname }}</p>
             </div>
             <div>
               <label class="field-label">Last name <span class="text-primary-500">*</span></label>
-              <input v-model="form.last_name" class="field-input" placeholder="Last name" />
-              <p v-if="errors.last_name" class="mt-1 text-xs text-rose-600">{{ errors.last_name }}</p>
+              <input v-model="form.lastname" class="field-input" placeholder="Last name" />
+              <p v-if="errors.lastname" class="mt-1 text-xs text-rose-600">{{ errors.lastname }}</p>
             </div>
           </div>
 
@@ -114,7 +109,7 @@ onMounted(async () => {
             <div class="relative">
               <select v-model="form.factory_id" class="field-input appearance-none pr-9">
                 <option value="" disabled>Select a factory</option>
-                <option v-for="f in factories" :key="f.id" :value="String(f.id)">{{ f.name }}</option>
+                <option v-for="f in factories" :key="f.id" :value="String(f.id)">{{ f.factory_name }}</option>
               </select>
               <AppIcon name="chevron" :size="16" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink/40" />
             </div>
@@ -139,29 +134,11 @@ onMounted(async () => {
             <AppIcon name="check" :size="16" />
             {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create employee' }}
           </button>
-          <button type="button" class="btn-ghost" @click="router.push({ name: 'employees' })">Cancel</button>
+          <button type="button" class="btn-ghost" @click="router.push({ name: ROUTE_NAMES.EMPLOYEES })">Cancel</button>
         </div>
       </form>
 
-      <aside class="h-fit rounded-2xl border border-line bg-primary-50/40 p-5">
-        <p class="eyebrow !text-ink/45">Validation rules</p>
-        <ul class="mt-4 space-y-3 text-sm">
-          <li v-for="r in rules" :key="r.field" class="flex gap-2.5">
-            <AppIcon
-              :name="r.required ? 'check' : 'arrowRight'"
-              :size="15"
-              class="mt-0.5 shrink-0"
-              :class="r.required ? 'text-emerald-500' : 'text-ink/35'"
-            />
-            <span class="text-ink/70">
-              <span class="font-semibold text-ink">{{ r.field }}</span> — {{ r.note }}
-            </span>
-          </li>
-        </ul>
-        <p class="mt-5 border-t border-line/70 pt-4 font-mono text-xs text-ink/40">
-          StoreEmployeeRequest::rules()
-        </p>
-      </aside>
+      <!-- Validation rules panel removed -->
     </div>
   </div>
 </template>

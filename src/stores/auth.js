@@ -1,46 +1,71 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import client from '@/api/client'
+import { http } from '@/api/http'
+import { API_ROUTES } from '@/api/endpoints'
+import { DEFAULTS, STORAGE_KEYS } from '@/config'
+import { getJsonStorage, getStorage, removeStorage, setJsonStorage, setStorage } from '@/utils'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('auth_token') || '')
-  const user = ref(JSON.parse(localStorage.getItem('auth_user') || 'null'))
+  // A token in localStorage means "remember me"; in sessionStorage it's session-only.
+  const remember = ref(!!getStorage(STORAGE_KEYS.AUTH_TOKEN))
+  const token = ref(
+    getStorage(STORAGE_KEYS.AUTH_TOKEN) || getStorage(STORAGE_KEYS.AUTH_TOKEN, '', true) || '',
+  )
+  const user = ref(
+    getJsonStorage(STORAGE_KEYS.AUTH_USER) ?? getJsonStorage(STORAGE_KEYS.AUTH_USER, null, true),
+  )
 
   const isAuthenticated = computed(() => !!token.value)
 
   function persist() {
-    if (token.value) localStorage.setItem('auth_token', token.value)
-    else localStorage.removeItem('auth_token')
-    if (user.value) localStorage.setItem('auth_user', JSON.stringify(user.value))
-    else localStorage.removeItem('auth_user')
+    // session=true → sessionStorage (cleared on browser close); false → localStorage.
+    const session = !remember.value
+    // Clear both stores first so the token never lingers in the wrong place.
+    removeStorage(STORAGE_KEYS.AUTH_TOKEN)
+    removeStorage(STORAGE_KEYS.AUTH_TOKEN, true)
+    removeStorage(STORAGE_KEYS.AUTH_USER)
+    removeStorage(STORAGE_KEYS.AUTH_USER, true)
+    if (token.value) setStorage(STORAGE_KEYS.AUTH_TOKEN, token.value, session)
+    if (user.value) setJsonStorage(STORAGE_KEYS.AUTH_USER, user.value, session)
   }
 
-  async function login({ email, password }) {
+  async function login({ email, password, remember: rememberMe = true }) {
+    remember.value = rememberMe
     try {
-      // Expected backend: POST /login -> { token, user }
-      const res = await client.post('/login', { email, password })
-      token.value = res.data?.token || 'session'
-      user.value = res.data?.user || { name: 'Admin', email }
-    } catch (err) {
-      // Backend unreachable: accept the seeded demo credentials offline.
-      const unreachable = !err?.status
-      const seeded = email === 'admin@admin.com' && password === 'password'
-      if (unreachable && seeded) {
-        token.value = 'demo-token'
-        user.value = { name: 'Admin', email }
-      } else if (unreachable) {
-        throw { status: 0, message: 'Invalid credentials.' }
-      } else {
-        throw err
+      // Documented backend: POST /auth/admin/login -> { status, message, data: { access_token } }
+      const res = await http.post(API_ROUTES.auth.login, { email, password })
+      if (res.data?.status === false) {
+        throw { status: 401, message: res.data?.message || 'Invalid credentials.' }
       }
+      token.value = res.data?.data?.access_token || ''
+      user.value = { name: DEFAULTS.USER_NAME, email }
+    } catch (err) {
+      throw err
     }
     persist()
+    // Pull the real profile (name, email, role) now that we have a token.
+    fetchProfile()
+    return user.value
+  }
+
+  async function fetchProfile() {
+    if (!token.value) return null
+    try {
+      const res = await http.get(API_ROUTES.auth.profile)
+      const data = res.data?.data ?? res.data
+      if (data) {
+        user.value = data
+        persist()
+      }
+    } catch {
+      /* ignore — keep whatever user we have */
+    }
     return user.value
   }
 
   async function logout() {
     try {
-      await client.post('/logout')
+      await http.post(API_ROUTES.auth.logout)
     } catch {
       /* ignore — clear locally regardless */
     }
@@ -49,5 +74,5 @@ export const useAuthStore = defineStore('auth', () => {
     persist()
   }
 
-  return { token, user, isAuthenticated, login, logout }
+  return { token, user, isAuthenticated, login, logout, fetchProfile }
 })

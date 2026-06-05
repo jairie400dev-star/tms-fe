@@ -1,22 +1,27 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { employeesApi, factoriesApi } from '@/api/resources'
+import Pagination from '@/components/Pagination.vue'
+import { employeesApi } from '@/api/resources'
 import { useToast } from '@/composables/useToast'
+import { ROUTE_NAMES } from '@/config'
 
 const router = useRouter()
 const toast = useToast()
 
 const employees = ref([])
 const factories = ref([])
+const pagination = ref({ total: 0, current_page: 1, total_page: 1 })
 const loading = ref(true)
 const search = ref('')
 const factoryFilter = ref('')
+const page = ref(1)
 const toDelete = ref(null)
 const deleting = ref(false)
+const viewing = ref(null)
 
 // Deterministic avatar colour per employee.
 const palette = [
@@ -28,27 +33,30 @@ const palette = [
   'bg-orange-100 text-orange-700',
 ]
 const avatarClass = (e) => palette[(e.id ?? 0) % palette.length]
-const initials = (e) => `${e.first_name?.[0] ?? ''}${e.last_name?.[0] ?? ''}`.toUpperCase()
+const initials = (e) => `${e.firstname?.[0] ?? e.first_name?.[0] ?? ''}${e.lastname?.[0] ?? e.last_name?.[0] ?? ''}`.toUpperCase()
 
-const filtered = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  return employees.value.filter((e) => {
-    const matchesFactory = !factoryFilter.value || String(e.factory_id) === factoryFilter.value
-    const matchesQuery =
-      !q ||
-      [`${e.first_name} ${e.last_name}`, e.email, e.phone, e.factory].some((v) =>
-        v?.toLowerCase().includes(q),
-      )
-    return matchesFactory && matchesQuery
-  })
+const totalPages = computed(() => pagination.value.total_page ?? 1)
+const pageLabel = computed(() => pagination.value.current_page ?? page.value)
+
+watch([search, factoryFilter], () => {
+  page.value = 1
+  load()
 })
+
+watch(page, load)
 
 async function load() {
   loading.value = true
   try {
-    const [emp, fac] = await Promise.all([employeesApi.list(), factoriesApi.list()])
-    employees.value = emp
-    factories.value = fac
+    const params = {
+      page: page.value,
+      search: search.value || undefined,
+      factory_id: factoryFilter.value || undefined,
+    }
+    const result = await employeesApi.list(params)
+    employees.value = result.data ?? []
+    factories.value = result.factories ?? factories.value
+    pagination.value = result.pagination || { total: employees.value.length, current_page: page.value, total_page: 1 }
   } catch (e) {
     toast.error(e?.message || 'Failed to load employees.')
   } finally {
@@ -78,7 +86,7 @@ onMounted(load)
   <div>
     <PageHeader title="Employees" subtitle="Everyone working across your factories.">
       <template #actions>
-        <button class="btn-primary" @click="router.push({ name: 'employee-create' })">
+        <button class="btn-primary" @click="router.push({ name: ROUTE_NAMES.EMPLOYEE_CREATE })">
           <AppIcon name="plus" :size="16" /> New employee
         </button>
       </template>
@@ -93,11 +101,11 @@ onMounted(load)
         <div class="relative w-full sm:w-56">
           <select v-model="factoryFilter" class="field-input appearance-none pr-9">
             <option value="">All factories</option>
-            <option v-for="f in factories" :key="f.id" :value="String(f.id)">{{ f.name }}</option>
+            <option v-for="f in factories" :key="f.id" :value="String(f.id)">{{ f.factory_name }}</option>
           </select>
           <AppIcon name="chevron" :size="16" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink/40" />
         </div>
-        <span class="shrink-0 px-1 text-sm text-ink/45">{{ filtered.length }} employees</span>
+        <span class="shrink-0 px-1 text-sm text-ink/45">{{ pagination.total ?? employees.length }} employees</span>
       </div>
 
       <div class="overflow-x-auto">
@@ -116,13 +124,13 @@ onMounted(load)
               <td class="table-td" colspan="5"><div class="h-5 w-full animate-pulse rounded bg-canvas" /></td>
             </tr>
 
-            <tr v-else-if="!filtered.length">
+            <tr v-else-if="!employees.length">
               <td colspan="5" class="px-5 py-16 text-center text-sm text-ink/45">No employees match your filters.</td>
             </tr>
 
             <tr
               v-else
-              v-for="e in filtered"
+              v-for="e in employees"
               :key="e.id"
               class="border-b border-line/70 transition-colors last:border-0 hover:bg-canvas/50"
             >
@@ -132,27 +140,27 @@ onMounted(load)
                     {{ initials(e) }}
                   </span>
                   <div class="leading-tight">
-                    <p class="font-semibold text-ink">{{ e.first_name }} {{ e.last_name }}</p>
+                    <p class="font-semibold text-ink">{{ e.firstname ?? e.first_name }} {{ e.lastname ?? e.last_name }}</p>
                     <p class="text-xs text-ink/40">#{{ e.id }}</p>
                   </div>
                 </div>
               </td>
               <td class="table-td">
                 <span class="inline-flex items-center gap-1.5 text-primary-600">
-                  <AppIcon name="link" :size="14" /> {{ e.factory }}
+                  <AppIcon name="link" :size="14" /> {{ e.factory ?? e.factory_name }}
                 </span>
               </td>
               <td class="table-td">{{ e.email }}</td>
               <td class="table-td font-mono text-[13px] text-ink/70">{{ e.phone }}</td>
               <td class="table-td">
                 <div class="flex items-center justify-end gap-1 text-ink/40">
-                  <button class="rounded-md p-1.5 hover:bg-canvas hover:text-ink" title="View">
+                  <button class="rounded-md p-1.5 hover:bg-canvas hover:text-ink" title="View" @click="viewing = e">
                     <AppIcon name="eye" :size="17" />
                   </button>
                   <button
                     class="rounded-md p-1.5 hover:bg-canvas hover:text-ink"
                     title="Edit"
-                    @click="router.push({ name: 'employee-edit', params: { id: e.id } })"
+                    @click="router.push({ name: ROUTE_NAMES.EMPLOYEE_EDIT, params: { id: e.id } })"
                   >
                     <AppIcon name="pencil" :size="17" />
                   </button>
@@ -165,13 +173,67 @@ onMounted(load)
           </tbody>
         </table>
       </div>
+
+      <div class="flex flex-col gap-3 border-t border-line bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <span class="text-sm text-ink/45">Page {{ pageLabel }} of {{ totalPages }}</span>
+        <Pagination v-model="page" :total-pages="totalPages" />
+      </div>
+    </div>
+
+    <!-- Detail modal -->
+    <div
+      v-if="viewing"
+      class="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4"
+      @click.self="viewing = null"
+    >
+      <div class="card w-full max-w-md p-6">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-3">
+            <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-semibold" :class="avatarClass(viewing)">
+              {{ initials(viewing) }}
+            </span>
+            <div class="leading-tight">
+              <h2 class="font-serif text-xl font-semibold text-ink">
+                {{ viewing.firstname ?? viewing.first_name }} {{ viewing.lastname ?? viewing.last_name }}
+              </h2>
+              <p class="text-xs text-ink/40">#{{ viewing.id }}</p>
+            </div>
+          </div>
+          <button class="rounded-md p-1.5 text-ink/40 hover:bg-canvas hover:text-ink" title="Close" @click="viewing = null">
+            <AppIcon name="x" :size="18" />
+          </button>
+        </div>
+        <dl class="mt-5 divide-y divide-line/70 text-sm">
+          <div class="flex justify-between gap-4 py-2.5">
+            <dt class="text-ink/45">Factory</dt>
+            <dd class="font-medium text-ink">{{ viewing.factory ?? viewing.factory_name ?? '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4 py-2.5">
+            <dt class="text-ink/45">Email</dt>
+            <dd class="font-medium text-ink">{{ viewing.email || '—' }}</dd>
+          </div>
+          <div class="flex justify-between gap-4 py-2.5">
+            <dt class="text-ink/45">Phone</dt>
+            <dd class="font-mono text-ink">{{ viewing.phone || '—' }}</dd>
+          </div>
+        </dl>
+        <div class="mt-6 flex justify-end gap-2">
+          <button class="btn-outline" @click="viewing = null">Close</button>
+          <button
+            class="btn-primary"
+            @click="router.push({ name: ROUTE_NAMES.EMPLOYEE_EDIT, params: { id: viewing.id } })"
+          >
+            <AppIcon name="pencil" :size="16" /> Edit
+          </button>
+        </div>
+      </div>
     </div>
 
     <ConfirmDialog
       :open="!!toDelete"
       :busy="deleting"
       title="Delete employee?"
-      :message="toDelete ? `${toDelete.first_name} ${toDelete.last_name} will be removed. This cannot be undone.` : ''"
+      :message="toDelete ? `${toDelete.firstname ?? toDelete.first_name} ${toDelete.lastname ?? toDelete.last_name} will be removed. This cannot be undone.` : ''"
       @confirm="confirmDelete"
       @cancel="toDelete = null"
     />

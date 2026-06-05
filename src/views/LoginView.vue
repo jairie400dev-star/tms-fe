@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ROUTE_NAMES, STORAGE_KEYS } from '@/config'
+import { getStorage, setStorage, removeStorage } from '@/utils'
 import BrandMark from '@/components/BrandMark.vue'
 import AppIcon from '@/components/AppIcon.vue'
 
@@ -9,9 +11,10 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const email = ref('admin@admin.com')
-const password = ref('password')
-const remember = ref(true)
+const rememberedEmail = getStorage(STORAGE_KEYS.REMEMBER_EMAIL)
+const email = ref(rememberedEmail)
+const password = ref('')
+const remember = ref(!!rememberedEmail)
 const loading = ref(false)
 const error = ref('')
 
@@ -19,8 +22,11 @@ async function submit() {
   error.value = ''
   loading.value = true
   try {
-    await auth.login({ email: email.value, password: password.value })
-    router.push(route.query.redirect || { name: 'dashboard' })
+    await auth.login({ email: email.value, password: password.value, remember: remember.value })
+    // Remember the email for next time (but never the password).
+    if (remember.value) setStorage(STORAGE_KEYS.REMEMBER_EMAIL, email.value)
+    else removeStorage(STORAGE_KEYS.REMEMBER_EMAIL)
+    router.push(route.query.redirect || { name: ROUTE_NAMES.DASHBOARD })
   } catch (e) {
     error.value = e?.message || 'Unable to sign in.'
   } finally {
@@ -115,21 +121,7 @@ async function submit() {
           network in order.
         </p>
 
-        <div class="mt-10 rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <p class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-300">
-            <AppIcon name="code" :size="14" /> Seeded admin
-          </p>
-          <dl class="mt-4 space-y-2.5 font-mono text-sm">
-            <div class="flex gap-6">
-              <dt class="w-20 text-white/40">email</dt>
-              <dd class="text-white/90">admin@admin.com</dd>
-            </div>
-            <div class="flex gap-6">
-              <dt class="w-20 text-white/40">password</dt>
-              <dd class="text-white/90">password</dd>
-            </div>
-          </dl>
-        </div>
+        <!-- Seeded admin panel removed -->
       </div>
     </div>
   </div>

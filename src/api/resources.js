@@ -1,93 +1,50 @@
-import client from './client'
-import { mockApi } from './mock'
+import { http } from './http'
+import { API_ROUTES } from './endpoints'
 
-// When true, always use in-memory mock data (no network calls).
-const FORCE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true'
+// Laravel resource responses are wrapped in paginated JSON like { success, pagination, data }.
+const unwrap = (res) => res.data?.data ?? res.data
+const unwrapPaged = (res) => ({
+  data: res.data?.data ?? res.data,
+  pagination: res.data?.pagination ?? null,
+  factories: res.data?.factories ?? null,
+  success: res.data?.success ?? null,
+})
 
-/**
- * Try the real API; if the backend is unreachable (network error, no response)
- * fall back to mock data so the UI is always demoable. Real HTTP errors
- * (422 validation, 404, etc.) are re-thrown so the UI can handle them.
- */
-async function withFallback(apiCall, mockCall) {
-  if (FORCE_MOCKS) return mockCall()
-  try {
-    return await apiCall()
-  } catch (err) {
-    const unreachable = !err?.status // no HTTP response => network/CORS/offline
-    if (unreachable) {
-      if (import.meta.env.DEV) {
-        console.warn('[api] backend unreachable — using mock data.', err?.message)
-      }
-      return mockCall()
-    }
-    throw err
+// Fetch every page of a paginated resource and return a flat array (for dropdowns, etc.).
+async function fetchAll(listFn, params = {}) {
+  const first = await listFn({ ...params, page: 1 })
+  const totalPages = first.pagination?.total_page ?? 1
+  const all = [...(first.data ?? [])]
+  if (totalPages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) => listFn({ ...params, page: i + 2 })),
+    )
+    rest.forEach((r) => all.push(...(r.data ?? [])))
   }
+  return all
 }
 
-// Laravel resource responses are often wrapped in `{ data: ... }`.
-const unwrap = (res) => res.data?.data ?? res.data
-
 export const factoriesApi = {
-  list: (params) =>
-    withFallback(
-      () => client.get('/factories', { params }).then(unwrap),
-      () => mockApi.listFactories(),
-    ),
-  get: (id) =>
-    withFallback(
-      () => client.get(`/factories/${id}`).then(unwrap),
-      () => mockApi.getFactory(id),
-    ),
-  create: (payload) =>
-    withFallback(
-      () => client.post('/factories', payload).then(unwrap),
-      () => mockApi.createFactory(payload),
-    ),
-  update: (id, payload) =>
-    withFallback(
-      () => client.put(`/factories/${id}`, payload).then(unwrap),
-      () => mockApi.updateFactory(id, payload),
-    ),
-  remove: (id) =>
-    withFallback(
-      () => client.delete(`/factories/${id}`).then(() => true),
-      () => mockApi.deleteFactory(id),
-    ),
+  list: (params = {}) => http.get(API_ROUTES.factories.list, params).then(unwrapPaged),
+  listAll: (params = {}) => fetchAll(factoriesApi.list, params),
+  get: (id) => http.get(API_ROUTES.factories.item(id)).then(unwrap),
+  create: (payload) => http.post(API_ROUTES.factories.list, payload).then(unwrap),
+  update: (id, payload) => http.put(API_ROUTES.factories.item(id), payload).then(unwrap),
+  remove: (id) => http.delete(API_ROUTES.factories.item(id)).then(() => true),
 }
 
 export const employeesApi = {
-  list: (params) =>
-    withFallback(
-      () => client.get('/employees', { params }).then(unwrap),
-      () => mockApi.listEmployees(),
-    ),
-  get: (id) =>
-    withFallback(
-      () => client.get(`/employees/${id}`).then(unwrap),
-      () => mockApi.getEmployee(id),
-    ),
-  create: (payload) =>
-    withFallback(
-      () => client.post('/employees', payload).then(unwrap),
-      () => mockApi.createEmployee(payload),
-    ),
-  update: (id, payload) =>
-    withFallback(
-      () => client.put(`/employees/${id}`, payload).then(unwrap),
-      () => mockApi.updateEmployee(id, payload),
-    ),
-  remove: (id) =>
-    withFallback(
-      () => client.delete(`/employees/${id}`).then(() => true),
-      () => mockApi.deleteEmployee(id),
-    ),
+  list: (params = {}) => http.get(API_ROUTES.employees.list, params).then(unwrapPaged),
+  get: (id) => http.get(API_ROUTES.employees.item(id)).then(unwrap),
+  create: (payload) => http.post(API_ROUTES.employees.list, payload).then(unwrap),
+  update: (id, payload) => http.put(API_ROUTES.employees.item(id), payload).then(unwrap),
+  remove: (id) => http.delete(API_ROUTES.employees.item(id)).then(() => true),
 }
 
 export const activityApi = {
-  list: (params) =>
-    withFallback(
-      () => client.get('/activity-log', { params }).then(unwrap),
-      () => mockApi.listActivity(),
-    ),
+  list: (params) => http.get(API_ROUTES.logs.list, params).then(unwrap),
+}
+
+export const dashboardApi = {
+  get: () => http.get(API_ROUTES.dashboard.get).then(unwrap),
 }

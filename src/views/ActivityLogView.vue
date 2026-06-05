@@ -2,12 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import LazyItem from '@/components/LazyItem.vue'
 import { activityApi } from '@/api/resources'
 import { useToast } from '@/composables/useToast'
+import { formatShortDateTime } from '@/utils'
 
 const toast = useToast()
 const events = ref([])
-const loading = ref(true)
+const loading = ref(true) // first load → skeleton
 const mode = ref('timeline') // 'timeline' | 'log'
 const actionFilter = ref('all') // all | created | updated | deleted
 
@@ -25,16 +27,17 @@ const filters = computed(() => [
   { key: 'deleted', label: 'Deleted' },
 ])
 
+// Filter client-side so it works regardless of backend query-param support.
 const filtered = computed(() =>
   actionFilter.value === 'all'
     ? events.value
-    : events.value.filter((e) => e.action === actionFilter.value),
+    : events.value.filter((e) => String(e.action).toLowerCase() === actionFilter.value),
 )
 
 // Render each event as a laravel.log line.
 const logLines = computed(() =>
   filtered.value.map((e) => {
-    const payload = { model: e.model, id: e.model_id, user_id: e.user_id }
+    const payload = { model: e.model, id: e.record_id ?? e.model_id, user_id: e.user_id }
     if (e.changes) {
       payload.changes = Object.fromEntries(
         Object.entries(e.changes).map(([k, v]) => [k, { old: v.old, new: v.new }]),
@@ -99,16 +102,18 @@ onMounted(load)
       </button>
     </div>
 
-    <!-- Loading -->
+    <!-- Loading skeleton (first load only) -->
     <div v-if="loading" class="mt-6 space-y-3">
       <div v-for="n in 3" :key="n" class="h-28 animate-pulse rounded-2xl bg-surface" />
     </div>
 
-    <!-- Timeline -->
-    <div v-else-if="mode === 'timeline'" class="mt-6 space-y-4">
-      <p v-if="!filtered.length" class="card p-10 text-center text-sm text-ink/45">No events to show.</p>
+    <div v-else class="mt-6">
+      <!-- Timeline -->
+      <div v-if="mode === 'timeline'" class="space-y-4">
+        <p v-if="!filtered.length" class="card p-10 text-center text-sm text-ink/45">No events to show.</p>
 
-      <article v-for="e in filtered" :key="e.id" class="card p-5">
+      <LazyItem v-for="(e, index) in filtered" :key="`${actionFilter}-${index}`" :min-height="110">
+        <article class="card p-5">
         <div class="flex flex-wrap items-start gap-3">
           <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg" :class="actionStyle[e.action]">
             <AppIcon :name="actionIcon[e.action]" :size="16" />
@@ -119,11 +124,13 @@ onMounted(load)
                 {{ e.action }}
               </span>
               <span class="font-semibold text-ink">{{ e.model }}</span>
-              <span class="text-sm text-ink/40">#{{ e.model_id }}</span>
+              <span class="text-sm text-ink/40">#{{ e.record_id ?? e.model_id }}</span>
             </div>
             <p class="mt-1 text-sm text-ink/70">{{ e.summary }}</p>
           </div>
-          <time class="shrink-0 font-mono text-xs text-ink/40">{{ e.created_at }}</time>
+          <time class="shrink-0 font-mono text-xs text-ink/40">
+            {{ e.created_at ? formatShortDateTime(e.created_at) : e.time_ago }}
+          </time>
         </div>
 
         <!-- Change diff table -->
@@ -148,13 +155,14 @@ onMounted(load)
 
         <p class="mt-3 flex items-center gap-1.5 text-xs text-ink/40">
           <AppIcon name="employees" :size="13" />
-          user_id: {{ e.user_id }} · {{ e.user_email }}
+          user_id: {{ e.user_id }}{{ e.user_email ? ` · ${e.user_email}` : '' }}
         </p>
-      </article>
+        </article>
+      </LazyItem>
     </div>
 
-    <!-- laravel.log terminal -->
-    <div v-else class="mt-6 overflow-hidden rounded-xl bg-ink-900 shadow-card">
+      <!-- laravel.log terminal -->
+      <div v-else class="overflow-hidden rounded-xl bg-ink-900 shadow-card">
       <div class="flex items-center gap-2 border-b border-white/10 px-4 py-3">
         <span class="h-3 w-3 rounded-full bg-rose-400" />
         <span class="h-3 w-3 rounded-full bg-amber-400" />
@@ -175,6 +183,7 @@ onMounted(load)
         </p>
         <p class="mt-1 text-emerald-400">$ <span class="animate-pulse">▌</span></p>
       </div>
+    </div>
     </div>
   </div>
 </template>

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { factoriesApi } from '@/api/resources'
 import { useToast } from '@/composables/useToast'
+import { ROUTE_NAMES } from '@/config'
 
 const props = defineProps({ id: { type: [String, Number], default: null } })
 const router = useRouter()
@@ -14,18 +15,13 @@ const saving = ref(false)
 const loading = ref(false)
 const errors = ref({})
 
-const form = ref({ name: '', location: '', email: '', website: '' })
+const form = ref({ factory_name: '', location: '', email: '', website: '' })
 
-const rules = [
-  { field: 'Factory name', note: 'required', required: true },
-  { field: 'Location', note: 'required', required: true },
-  { field: 'Email', note: 'optional, valid email', required: false },
-  { field: 'Website', note: 'optional, valid URL', required: false },
-]
+// Validation rules panel removed
 
 function validate() {
   const e = {}
-  if (!form.value.name.trim()) e.name = 'Factory name is required.'
+  if (!form.value.factory_name.trim()) e.factory_name = 'Factory name is required.'
   if (!form.value.location.trim()) e.location = 'Location is required.'
   if (form.value.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.value.email))
     e.email = 'Enter a valid email.'
@@ -44,7 +40,7 @@ async function submit() {
       await factoriesApi.create(form.value)
       toast.success('Factory created.')
     }
-    router.push({ name: 'factories' })
+    router.push({ name: ROUTE_NAMES.FACTORIES })
   } catch (e) {
     if (e?.errors) errors.value = Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k, v[0]]))
     toast.error(e?.message || 'Failed to save factory.')
@@ -58,7 +54,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const f = await factoriesApi.get(props.id)
-    if (f) form.value = { name: f.name, location: f.location, email: f.email || '', website: f.website || '' }
+    if (f) form.value = { factory_name: f.factory_name, location: f.location, email: f.email || '', website: f.website || '' }
   } catch (e) {
     toast.error(e?.message || 'Failed to load factory.')
   } finally {
@@ -70,7 +66,7 @@ onMounted(async () => {
 <template>
   <div>
     <nav class="flex items-center gap-1.5 text-sm text-primary-600">
-      <router-link :to="{ name: 'factories' }" class="hover:underline">Factories</router-link>
+      <router-link :to="{ name: ROUTE_NAMES.FACTORIES }" class="hover:underline">Factories</router-link>
       <AppIcon name="chevron" :size="14" class="-rotate-90 text-ink/30" />
       <span class="text-ink/50">{{ isEdit ? 'Edit factory' : 'New factory' }}</span>
     </nav>
@@ -86,8 +82,8 @@ onMounted(async () => {
         <div class="space-y-5">
           <div>
             <label class="field-label">Factory name <span class="text-primary-500">*</span></label>
-            <input v-model="form.name" class="field-input" placeholder="e.g. Meridian Steelworks" />
-            <p v-if="errors.name" class="mt-1 text-xs text-rose-600">{{ errors.name }}</p>
+            <input v-model="form.factory_name" class="field-input" placeholder="e.g. Meridian Steelworks" />
+            <p v-if="errors.factory_name" class="mt-1 text-xs text-rose-600">{{ errors.factory_name }}</p>
           </div>
 
           <div class="grid gap-5 sm:grid-cols-2">
@@ -118,26 +114,7 @@ onMounted(async () => {
         </div>
       </form>
 
-      <!-- Validation rules panel -->
-      <aside class="h-fit rounded-2xl border border-line bg-primary-50/40 p-5">
-        <p class="eyebrow !text-ink/45">Validation rules</p>
-        <ul class="mt-4 space-y-3 text-sm">
-          <li v-for="r in rules" :key="r.field" class="flex gap-2.5">
-            <AppIcon
-              :name="r.required ? 'check' : 'arrowRight'"
-              :size="15"
-              class="mt-0.5 shrink-0"
-              :class="r.required ? 'text-emerald-500' : 'text-ink/35'"
-            />
-            <span class="text-ink/70">
-              <span class="font-semibold text-ink">{{ r.field }}</span> — {{ r.note }}
-            </span>
-          </li>
-        </ul>
-        <p class="mt-5 border-t border-line/70 pt-4 font-mono text-xs text-ink/40">
-          StoreFactoryRequest::rules()
-        </p>
-      </aside>
+      <!-- Validation rules panel removed -->
     </div>
   </div>
 </template>

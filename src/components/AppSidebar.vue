@@ -1,9 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import BrandMark from './BrandMark.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
 import { useAuthStore } from '@/stores/auth'
+import { DEFAULTS, ROUTE_NAMES } from '@/config'
+import { toInitials } from '@/utils'
 
 const props = defineProps({
   counts: { type: Object, default: () => ({ factories: null, employees: null }) },
@@ -14,20 +18,26 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const nav = computed(() => [
-  { name: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { name: 'factories', label: 'Factories', icon: 'factory', badge: props.counts.factories },
-  { name: 'employees', label: 'Employees', icon: 'employees', badge: props.counts.employees },
-  { name: 'activity', label: 'Activity log', icon: 'activity' },
+  { name: ROUTE_NAMES.DASHBOARD, label: 'Dashboard', icon: 'dashboard' },
+  { name: ROUTE_NAMES.FACTORIES, label: 'Factories', icon: 'factory', badge: props.counts.factories },
+  { name: ROUTE_NAMES.EMPLOYEES, label: 'Employees', icon: 'employees', badge: props.counts.employees },
+  { name: ROUTE_NAMES.ACTIVITY, label: 'Activity log', icon: 'activity' },
 ])
 
-const initials = computed(() => {
-  const n = auth.user?.name || 'Admin'
-  return n.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()
-})
+const initials = computed(() => toInitials(auth.user?.name || DEFAULTS.USER_NAME))
+
+const showLogout = ref(false)
+const loggingOut = ref(false)
 
 async function signOut() {
-  await auth.logout()
-  router.push({ name: 'login' })
+  loggingOut.value = true
+  try {
+    await auth.logout()
+    router.push({ name: ROUTE_NAMES.LOGIN })
+  } finally {
+    loggingOut.value = false
+    showLogout.value = false
+  }
 }
 </script>
 
@@ -81,17 +91,27 @@ async function signOut() {
           {{ initials }}
         </span>
         <div class="min-w-0 flex-1 leading-tight">
-          <p class="truncate text-sm font-semibold text-white">{{ auth.user?.name || 'Admin' }}</p>
-          <p class="truncate text-xs text-white/45">{{ auth.user?.email || 'admin@admin.com' }}</p>
+          <p class="truncate text-sm font-semibold text-white">{{ auth.user?.name || DEFAULTS.USER_NAME }}</p>
+          <p class="truncate text-xs text-white/45">{{ auth.user?.email || DEFAULTS.USER_EMAIL }}</p>
         </div>
       </div>
       <button
         class="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-        @click="signOut"
+        @click="showLogout = true"
       >
         <AppIcon name="logout" :size="18" class="text-white/45" />
         Sign out
       </button>
     </div>
+
+    <ConfirmDialog
+      :open="showLogout"
+      :busy="loggingOut"
+      title="Sign out?"
+      message="You'll need to sign in again to access the console."
+      confirm-label="Sign out"
+      @confirm="signOut"
+      @cancel="showLogout = false"
+    />
   </aside>
 </template>
