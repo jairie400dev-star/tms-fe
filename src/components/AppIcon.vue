@@ -20,12 +20,8 @@ const paths = {
   logout: '<path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
   check: '<path d="m5 12 5 5L20 7"/>',
-  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
-  arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
   link: '<path d="M9 15l6-6M10 6h7a1 1 0 0 1 1 1v7"/>',
-  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>',
-  code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>',
   building: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>',
 }
 

@@ -88,12 +88,6 @@ export const removeCookie = (name) => {
 // Basic email shape check for client-side form validation (backend validates too).
 export const isValidEmail = (value) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value))
 
-export const includesText = (value, query) => {
-  if (!query) return true
-  if (value == null) return false
-  return String(value).toLowerCase().includes(String(query).toLowerCase())
-}
-
 export const formatShortDateTime = (value) => {
   if (!value) return ''
   const date = new Date(value)

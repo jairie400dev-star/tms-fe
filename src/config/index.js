@@ -26,7 +26,6 @@ export const ROUTE_NAMES = {
 export const DEFAULTS = {
   USER_NAME: 'Admin',
   USER_EMAIL: 'admin@admin.com',
-  DEMO_CREDENTIALS: { email: 'admin@admin.com', password: 'password' },
 }
 
 export const URL_PATHS = {

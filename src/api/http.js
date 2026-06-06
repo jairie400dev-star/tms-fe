@@ -7,5 +7,4 @@ export const http = {
   post: (url, data) => client.post(url, data),
   put: (url, data) => client.put(url, data),
   delete: (url, config) => client.delete(url, config),
-  request: (config) => client.request(config),
 }
