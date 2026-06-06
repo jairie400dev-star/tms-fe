@@ -1,4 +1,6 @@
 <script setup>
+// Admin sign-in screen. "Remember me" both keeps the session persistent (vs. session-only)
+// and pre-fills the email on the next visit.
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -120,8 +122,6 @@ async function submit() {
           Create and edit records, track every change, and keep your manufacturing
           network in order.
         </p>
-
-        <!-- Seeded admin panel removed -->
       </div>
     </div>
   </div>

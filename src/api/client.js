@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE_URL, HTTP_HEADERS, STORAGE_KEYS, URL_PATHS } from '@/config'
+import { getCookie, removeCookie } from '@/utils'
 
 /**
  * Central axios instance. All resource services build on top of this.
@@ -14,11 +15,9 @@ const client = axios.create({
 
 })
 
-// Attach a bearer token if one was stored at login (persistent or session-only).
+// Attach the bearer token (stored in a cookie at login) to every request.
 client.interceptors.request.use((config) => {
-  const token =
-    localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) ||
-    sessionStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
+  const token = getCookie(STORAGE_KEYS.AUTH_TOKEN)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -31,8 +30,7 @@ client.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     if (status === 401 && !window.location.pathname.startsWith(URL_PATHS.LOGIN)) {
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN)
-      sessionStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN)
+      removeCookie(STORAGE_KEYS.AUTH_TOKEN)
       // Soft redirect; router guard will also catch this.
       window.location.assign(URL_PATHS.LOGIN)
     }

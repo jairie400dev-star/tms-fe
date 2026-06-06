@@ -1,65 +1,39 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+// Create / edit a factory. Same component for both — edit mode is keyed off the `id` prop.
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { factoriesApi } from '@/api/resources'
-import { useToast } from '@/composables/useToast'
+import { useResourceForm } from '@/composables/useResourceForm'
+import { isValidEmail } from '@/utils'
 import { ROUTE_NAMES } from '@/config'
 
 const props = defineProps({ id: { type: [String, Number], default: null } })
 const router = useRouter()
-const toast = useToast()
 
-const isEdit = computed(() => props.id != null)
-const saving = ref(false)
-const loading = ref(false)
-const errors = ref({})
-
-const form = ref({ factory_name: '', location: '', email: '', website: '' })
-
-// Validation rules panel removed
-
-function validate() {
-  const e = {}
-  if (!form.value.factory_name.trim()) e.factory_name = 'Factory name is required.'
-  if (!form.value.location.trim()) e.location = 'Location is required.'
-  if (form.value.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.value.email))
-    e.email = 'Enter a valid email.'
-  errors.value = e
-  return Object.keys(e).length === 0
-}
-
-async function submit() {
-  if (!validate()) return
-  saving.value = true
-  try {
-    if (isEdit.value) {
-      await factoriesApi.update(props.id, form.value)
-      toast.success('Factory updated.')
-    } else {
-      await factoriesApi.create(form.value)
-      toast.success('Factory created.')
-    }
-    router.push({ name: ROUTE_NAMES.FACTORIES })
-  } catch (e) {
-    if (e?.errors) errors.value = Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k, v[0]]))
-    toast.error(e?.message || 'Failed to save factory.')
-  } finally {
-    saving.value = false
-  }
-}
-
-onMounted(async () => {
-  if (!isEdit.value) return
-  loading.value = true
-  try {
-    const f = await factoriesApi.get(props.id)
-    if (f) form.value = { factory_name: f.factory_name, location: f.location, email: f.email || '', website: f.website || '' }
-  } catch (e) {
-    toast.error(e?.message || 'Failed to load factory.')
-  } finally {
-    loading.value = false
-  }
+const { form, errors, saving, isEdit, submit } = useResourceForm({
+  getId: () => props.id,
+  api: factoriesApi,
+  initialForm: () => ({ factory_name: '', location: '', email: '', website: '' }),
+  toForm: (f) => ({
+    factory_name: f.factory_name,
+    location: f.location,
+    email: f.email || '',
+    website: f.website || '',
+  }),
+  validate: (form) => {
+    const e = {}
+    if (!form.factory_name.trim()) e.factory_name = 'Factory name is required.'
+    if (!form.location.trim()) e.location = 'Location is required.'
+    if (form.email && !isValidEmail(form.email)) e.email = 'Enter a valid email.'
+    return e
+  },
+  messages: {
+    created: 'Factory created.',
+    updated: 'Factory updated.',
+    loadFailed: 'Failed to load factory.',
+    saveFailed: 'Failed to save factory.',
+  },
+  redirect: { name: ROUTE_NAMES.FACTORIES },
 })
 </script>
 
@@ -113,8 +87,6 @@ onMounted(async () => {
           <button type="button" class="btn-ghost" @click="router.push({ name: 'factories' })">Cancel</button>
         </div>
       </form>
-
-      <!-- Validation rules panel removed -->
     </div>
   </div>
 </template>

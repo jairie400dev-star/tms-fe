@@ -1,26 +1,59 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+// Employees list: server-side search, factory filter, pagination, view-details modal, and delete.
+import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import { employeesApi } from '@/api/resources'
-import { useToast } from '@/composables/useToast'
+import { useResourceList } from '@/composables/useResourceList'
+import { useConfirmDelete } from '@/composables/useConfirmDelete'
+import { useCounts } from '@/composables/useCounts'
 import { ROUTE_NAMES } from '@/config'
 
 const router = useRouter()
-const toast = useToast()
+const { set: setCount } = useCounts()
 
-const employees = ref([])
-const factories = ref([])
-const pagination = ref({ total: 0, current_page: 1, total_page: 1 })
-const loading = ref(true)
-const search = ref('')
+const factories = ref([]) // factory lookup for the filter dropdown (comes back with the list)
 const factoryFilter = ref('')
-const page = ref(1)
-const toDelete = ref(null)
-const deleting = ref(false)
+
+// Shared list state, with the factory filter mixed into the query and the
+// factory lookup captured from each response.
+const {
+  items: employees,
+  pagination,
+  loading,
+  search,
+  page,
+  totalPages,
+  pageLabel,
+  load,
+  reload,
+} = useResourceList(employeesApi.list, {
+  extraParams: () => ({ factory_id: factoryFilter.value || undefined }),
+  onLoaded: (res) => {
+    factories.value = res.factories ?? factories.value
+    // Keep the sidebar's employee badge in sync — but only when unfiltered, so it's the true total.
+    if (!search.value && !factoryFilter.value) setCount('employees', res.pagination?.total)
+  },
+  errorMessage: 'Failed to load employees.',
+})
+
+// The factory dropdown filters instantly (search is already debounced in the composable).
+watch(factoryFilter, reload)
+
+// Shared confirm + delete flow (reloads the list afterwards to keep totals accurate).
+const {
+  target: toDelete,
+  deleting,
+  confirm: confirmDelete,
+} = useConfirmDelete(employeesApi.remove, {
+  successMessage: () => 'Employee deleted.',
+  errorMessage: 'Failed to delete employee.',
+  onDeleted: load,
+})
+
 const viewing = ref(null)
 
 // Deterministic avatar colour per employee.
@@ -34,50 +67,6 @@ const palette = [
 ]
 const avatarClass = (e) => palette[(e.id ?? 0) % palette.length]
 const initials = (e) => `${e.firstname?.[0] ?? e.first_name?.[0] ?? ''}${e.lastname?.[0] ?? e.last_name?.[0] ?? ''}`.toUpperCase()
-
-const totalPages = computed(() => pagination.value.total_page ?? 1)
-const pageLabel = computed(() => pagination.value.current_page ?? page.value)
-
-watch([search, factoryFilter], () => {
-  page.value = 1
-  load()
-})
-
-watch(page, load)
-
-async function load() {
-  loading.value = true
-  try {
-    const params = {
-      page: page.value,
-      search: search.value || undefined,
-      factory_id: factoryFilter.value || undefined,
-    }
-    const result = await employeesApi.list(params)
-    employees.value = result.data ?? []
-    factories.value = result.factories ?? factories.value
-    pagination.value = result.pagination || { total: employees.value.length, current_page: page.value, total_page: 1 }
-  } catch (e) {
-    toast.error(e?.message || 'Failed to load employees.')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function confirmDelete() {
-  if (!toDelete.value) return
-  deleting.value = true
-  try {
-    await employeesApi.remove(toDelete.value.id)
-    employees.value = employees.value.filter((e) => e.id !== toDelete.value.id)
-    toast.success('Employee deleted.')
-    toDelete.value = null
-  } catch (e) {
-    toast.error(e?.message || 'Failed to delete employee.')
-  } finally {
-    deleting.value = false
-  }
-}
 
 onMounted(load)
 </script>

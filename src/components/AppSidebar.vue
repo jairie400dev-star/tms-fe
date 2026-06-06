@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+// Primary navigation sidebar: nav links with optional count badges, the signed-in
+// user card, and a sign-out button (with confirmation dialog).
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import BrandMark from './BrandMark.vue'
 import ConfirmDialog from './ConfirmDialog.vue'

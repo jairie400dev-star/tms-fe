@@ -1,4 +1,5 @@
 <script setup>
+// App logo + wordmark. Used in the sidebar and login screen.
 defineProps({
   // 'light' for dark backgrounds, 'dark' for light backgrounds
   variant: { type: String, default: 'dark' },

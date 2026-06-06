@@ -1,76 +1,55 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+// Create / edit an employee. Same component for both — edit mode is keyed off the `id` prop.
+// Loads the full factory list (all pages) to populate the factory <select>.
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { employeesApi, factoriesApi } from '@/api/resources'
-import { useToast } from '@/composables/useToast'
+import { useResourceForm } from '@/composables/useResourceForm'
+import { isValidEmail } from '@/utils'
 import { ROUTE_NAMES } from '@/config'
 
 const props = defineProps({ id: { type: [String, Number], default: null } })
 const router = useRouter()
-const toast = useToast()
 
-const isEdit = computed(() => props.id != null)
-const saving = ref(false)
-const errors = ref({})
-const factories = ref([])
+const factories = ref([]) // options for the factory <select>
 
-const form = ref({ firstname: '', lastname: '', factory_id: '', email: '', phone: '' })
+const { form, errors, saving, isEdit, submit } = useResourceForm({
+  getId: () => props.id,
+  api: employeesApi,
+  initialForm: () => ({ firstname: '', lastname: '', factory_id: '', email: '', phone: '' }),
+  toForm: (e) => ({
+    firstname: (e.firstname ?? e.first_name) || '',
+    lastname: (e.lastname ?? e.last_name) || '',
+    factory_id: String(e.factory_id ?? ''),
+    email: e.email || '',
+    phone: e.phone || '',
+  }),
+  validate: (form) => {
+    const e = {}
+    if (!form.firstname.trim()) e.firstname = 'First name is required.'
+    if (!form.lastname.trim()) e.lastname = 'Last name is required.'
+    if (!form.factory_id) e.factory_id = 'Please choose a factory.'
+    if (form.email && !isValidEmail(form.email)) e.email = 'Enter a valid email.'
+    return e
+  },
+  // factory_id is a string in the <select>; the API expects a number.
+  toPayload: (form) => ({ ...form, factory_id: Number(form.factory_id) }),
+  messages: {
+    created: 'Employee created.',
+    updated: 'Employee updated.',
+    loadFailed: 'Failed to load employee.',
+    saveFailed: 'Failed to save employee.',
+  },
+  redirect: { name: ROUTE_NAMES.EMPLOYEES },
+})
 
-// Validation rules panel removed
-
-function validate() {
-  const e = {}
-  if (!form.value.firstname.trim()) e.firstname = 'First name is required.'
-  if (!form.value.lastname.trim()) e.lastname = 'Last name is required.'
-  if (!form.value.factory_id) e.factory_id = 'Please choose a factory.'
-  if (form.value.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.value.email))
-    e.email = 'Enter a valid email.'
-  errors.value = e
-  return Object.keys(e).length === 0
-}
-
-async function submit() {
-  if (!validate()) return
-  saving.value = true
-  try {
-    const payload = { ...form.value, factory_id: Number(form.value.factory_id) }
-    if (isEdit.value) {
-      await employeesApi.update(props.id, payload)
-      toast.success('Employee updated.')
-    } else {
-      await employeesApi.create(payload)
-      toast.success('Employee created.')
-    }
-    router.push({ name: 'employees' })
-  } catch (e) {
-    if (e?.errors) errors.value = Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k, v[0]]))
-    toast.error(e?.message || 'Failed to save employee.')
-  } finally {
-    saving.value = false
-  }
-}
-
+// Load factory options for the dropdown (all pages).
 onMounted(async () => {
   try {
     factories.value = await factoriesApi.listAll()
   } catch {
-    /* ignore */
-  }
-  if (isEdit.value) {
-    try {
-      const e = await employeesApi.get(props.id)
-      if (e)
-        form.value = {
-          firstname: (e.firstname ?? e.first_name) || '',
-          lastname: (e.lastname ?? e.last_name) || '',
-          factory_id: String(e.factory_id ?? ''),
-          email: e.email || '',
-          phone: e.phone || '',
-        }
-    } catch (err) {
-      toast.error(err?.message || 'Failed to load employee.')
-    }
+    /* ignore — the dropdown just stays empty */
   }
 })
 </script>
@@ -137,8 +116,6 @@ onMounted(async () => {
           <button type="button" class="btn-ghost" @click="router.push({ name: ROUTE_NAMES.EMPLOYEES })">Cancel</button>
         </div>
       </form>
-
-      <!-- Validation rules panel removed -->
     </div>
   </div>
 </template>

@@ -1,4 +1,6 @@
 <script setup>
+// Standard page heading: optional eyebrow + title + subtitle, with an #actions slot
+// for buttons on the right (e.g. "New factory").
 defineProps({
   eyebrow: { type: String, default: '' },
   title: { type: String, required: true },

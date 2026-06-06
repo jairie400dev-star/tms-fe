@@ -1,8 +1,12 @@
 import { http } from './http'
 import { API_ROUTES } from './endpoints'
 
-// Laravel resource responses are wrapped in paginated JSON like { success, pagination, data }.
+// Resource services: one object per backend resource, returning plain data to the views.
+// Laravel responses are wrapped, e.g. { success, pagination, data } — these helpers unwrap them.
+
+// Pull the payload out of a single-object response ({ data: {...} } or the object itself).
 const unwrap = (res) => res.data?.data ?? res.data
+// Normalize a paginated list response into a consistent shape for the views.
 const unwrapPaged = (res) => ({
   data: res.data?.data ?? res.data,
   pagination: res.data?.pagination ?? null,
@@ -35,6 +39,7 @@ export const factoriesApi = {
 
 export const employeesApi = {
   list: (params = {}) => http.get(API_ROUTES.employees.list, params).then(unwrapPaged),
+  listAll: (params = {}) => fetchAll(employeesApi.list, params),
   get: (id) => http.get(API_ROUTES.employees.item(id)).then(unwrap),
   create: (payload) => http.post(API_ROUTES.employees.list, payload).then(unwrap),
   update: (id, payload) => http.put(API_ROUTES.employees.item(id), payload).then(unwrap),

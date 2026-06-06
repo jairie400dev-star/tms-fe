@@ -1,3 +1,5 @@
+// Route table + auth guard. Login is public; everything else lives under the
+// AdminLayout shell and requires authentication.
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_NAMES } from '@/config'
@@ -33,12 +35,14 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
-// Auth guard disabled to allow visiting the dashboard without logging in
+// Auth guard: protected routes require a token; signed-in users skip the login page.
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  // Not logged in and route isn't public → send to login, remembering where they were headed.
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: ROUTE_NAMES.LOGIN, query: { redirect: to.fullPath } }
   }
+  // Already logged in → don't show the login page.
   if (to.name === ROUTE_NAMES.LOGIN && auth.isAuthenticated) {
     return { name: ROUTE_NAMES.DASHBOARD }
   }

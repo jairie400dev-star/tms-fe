@@ -1,4 +1,6 @@
 <script setup>
+// Reusable confirmation modal (delete, sign out, etc.). Teleported to <body> so it
+// always overlays the page, and locks page scroll while open.
 import { watch, onBeforeUnmount } from 'vue'
 import AppIcon from './AppIcon.vue'
 

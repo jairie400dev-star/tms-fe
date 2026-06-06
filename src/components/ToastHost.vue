@@ -1,9 +1,12 @@
 <script setup>
+// Renders the global toast queue (bottom-right). Mounted once in App.vue;
+// other components trigger toasts via the useToast composable.
 import { useToast } from '@/composables/useToast'
 import AppIcon from './AppIcon.vue'
 
 const { toasts, dismiss } = useToast()
 
+// Colour scheme per toast type.
 const tone = {
   success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   error: 'border-rose-200 bg-rose-50 text-rose-800',

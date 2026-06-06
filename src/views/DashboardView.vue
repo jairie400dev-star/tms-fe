@@ -1,4 +1,6 @@
 <script setup>
+// Dashboard: stat cards, recent activity, quick actions, and top factories by headcount.
+// All figures come from GET /api/dashboard (plus a factory list for the "Locations" stat).
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'

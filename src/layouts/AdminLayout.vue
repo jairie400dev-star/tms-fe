@@ -1,29 +1,23 @@
 <script setup>
+// Authenticated app shell: responsive sidebar (slide-in drawer on mobile) + routed content.
+// On mount it refreshes the user profile and the sidebar badge counts. The counts are
+// shared state (useCounts) so list views keep them current as records are added/removed.
 import { ref, onMounted } from 'vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import BrandMark from '@/components/BrandMark.vue'
 import AppIcon from '@/components/AppIcon.vue'
-import { factoriesApi, employeesApi } from '@/api/resources'
 import { useAuthStore } from '@/stores/auth'
+import { useCounts } from '@/composables/useCounts'
 
 const auth = useAuthStore()
+const { counts, refresh: refreshCounts } = useCounts()
 const mobileOpen = ref(false)
-const counts = ref({ factories: null, employees: null })
 
-onMounted(async () => {
+onMounted(() => {
   // Refresh the signed-in user's profile (name, email, role) for the sidebar.
   auth.fetchProfile()
-
-  // Populate sidebar badges. Failures are silent — badges just stay hidden.
-  try {
-    const [f, e] = await Promise.all([factoriesApi.list(), employeesApi.list()])
-    counts.value = {
-      factories: f?.pagination?.total ?? (Array.isArray(f?.data) ? f.data.length : null),
-      employees: e?.pagination?.total ?? (Array.isArray(e?.data) ? e.data.length : null),
-    }
-  } catch {
-    /* ignore */
-  }
+  // Seed the sidebar badge counts (list views keep them current afterwards).
+  refreshCounts()
 })
 </script>
 

@@ -1,63 +1,51 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+// Factories list: server-side search + pagination, view-details modal, and delete.
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import { factoriesApi } from '@/api/resources'
-import { useToast } from '@/composables/useToast'
+import { useResourceList } from '@/composables/useResourceList'
+import { useConfirmDelete } from '@/composables/useConfirmDelete'
+import { useCounts } from '@/composables/useCounts'
 import { ROUTE_NAMES } from '@/config'
 
 const router = useRouter()
-const toast = useToast()
+const { set: setCount } = useCounts()
 
-const factories = ref([])
-const pagination = ref({ total: 0, current_page: 1, total_page: 1 })
-const loading = ref(true)
-const search = ref('')
-const page = ref(1)
-const toDelete = ref(null)
-const deleting = ref(false)
-const viewing = ref(null)
-
-const totalPages = computed(() => pagination.value.total_page ?? 1)
-const pageLabel = computed(() => pagination.value.current_page ?? page.value)
-
-watch(search, () => {
-  page.value = 1
-  load()
+// Shared list state: items + pagination + debounced search + load/reload.
+// Keep the sidebar's factory badge in sync with the server total on every load.
+const {
+  items: factories,
+  pagination,
+  loading,
+  search,
+  page,
+  totalPages,
+  pageLabel,
+  load,
+} = useResourceList(factoriesApi.list, {
+  errorMessage: 'Failed to load factories.',
+  // Only sync the badge when unfiltered, so it reflects the true total (not a search subset).
+  onLoaded: (res) => {
+    if (!search.value) setCount('factories', res.pagination?.total)
+  },
 })
 
-watch(page, load)
+// Shared confirm + delete flow (reloads the list afterwards to keep totals accurate).
+const {
+  target: toDelete,
+  deleting,
+  confirm: confirmDelete,
+} = useConfirmDelete(factoriesApi.remove, {
+  successMessage: (f) => `${f.factory_name} deleted.`,
+  errorMessage: 'Failed to delete factory.',
+  onDeleted: load,
+})
 
-async function load() {
-  loading.value = true
-  try {
-    const res = await factoriesApi.list({ page: page.value, search: search.value || undefined })
-    factories.value = res.data ?? []
-    pagination.value = res.pagination || { total: factories.value.length, current_page: page.value, total_page: 1 }
-  } catch (e) {
-    toast.error(e?.message || 'Failed to load factories.')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function confirmDelete() {
-  if (!toDelete.value) return
-  deleting.value = true
-  try {
-    await factoriesApi.remove(toDelete.value.id)
-    toast.success(`${toDelete.value.factory_name} deleted.`)
-    toDelete.value = null
-    await load()
-  } catch (e) {
-    toast.error(e?.message || 'Failed to delete factory.')
-  } finally {
-    deleting.value = false
-  }
-}
+const viewing = ref(null)
 
 onMounted(load)
 </script>

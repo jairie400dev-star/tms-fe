@@ -1,4 +1,7 @@
 <script setup>
+// Activity log: model events from GET /api/logs, shown as a timeline or a faux laravel.log.
+// Filter pills (created/updated/deleted) filter client-side; the timeline is virtualized
+// (LazyItem) so only cards near the viewport are rendered.
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AppIcon from '@/components/AppIcon.vue'
